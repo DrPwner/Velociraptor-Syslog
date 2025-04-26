@@ -1,6 +1,6 @@
 # Velociraptor Syslog Monitor
 
-A Python-based monitoring system that listens for Velociraptor audit logs via syslog and sends email notifications about important user actions.
+A Python-based monitoring system that monitors Velociraptor audit logs via Velociraptor syslog feaure and sends email notifications about important user actions.
 
 ## Overview
 
