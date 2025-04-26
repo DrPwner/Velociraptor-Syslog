@@ -54,7 +54,7 @@ Logging:
   # ... other logging configurations ...
   output_directory: /opt/velociraptor/logs
   separate_logs_per_component: true
-  remote_syslog_server: 10.2.1.22:514
+  remote_syslog_server: 192.168.1.10:514
   remote_syslog_protocol: "udp"
   remote_syslog_components:
   - VelociraptorAudit
