@@ -60,6 +60,7 @@ Logging:
   - VelociraptorAudit
 ```
 https://github.com/Velocidex/velociraptor/blob/master/docs/references/server.config.yaml#L984
+
 **Important:** Only forward `VelociraptorAudit` syslog messages to this service. The script is designed to parse and process these specific messages.
 
 ## Usage
