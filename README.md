@@ -11,13 +11,14 @@ This tool monitors Velociraptor's syslog messages for specific actions performed
 - **Real-time monitoring**: Listens for Velociraptor audit logs via UDP syslog (default port 514)
 - **Comprehensive activity detection**: Monitors numerous critical user actions including:
   - PowerShell and CMD command execution
-  - Host quarantine/isolation actions (application and removal)
+  - Host quarantine/isolation actions
+  - Host quarantine/isolation removal
   - Hunt creation, execution, cancellation, and deletion
   - Client label management
-  - Directory traversal (normal and NTFS)
-  - Recursive directory operations
-  - Recursive file downloads
-  - Registry access
+  - VFS Directory traversal
+  - Recursive VFS directory operations
+  - Recursive VFS file downloads
+  - VFS Registry access (Traversals & download opperations)
   - Artifact management (creation and deletion)
   - User account management
   - Organization creation
