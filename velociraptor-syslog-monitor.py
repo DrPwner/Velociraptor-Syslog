@@ -129,20 +129,23 @@ PATTERNS = {
     'hunt_created': re.compile(r'msg=CreateHunt details="{(?P<details>.*?)}" operation=CreateHunt principal=(?P<principal>\w+)'),
     'password_reset': re.compile(r'msg="Update password" details="{(?P<details>.*?)}" operation="Update password" principal=(?P<principal>\w+)'),
     'registry_traversal': re.compile(r'msg=ScheduleFlow.*?System\.VFS\.ListDirectory.*?Accessor","value":"registry".*?principal=(?P<principal>\w+)'),
-    
+
 #    'user_grant': re.compile(r'msg=user_grant details="{(?P<details>.*?)}" operation=user_grant principal=(?P<principal>\w+)'),
 #    'user_logon': re.compile(r'method=GET remote="(?P<remote>.*?)" status=\d+ url=/app/index\.html user=(?P<user>\w+) user-agent="(?P<user_agent>.*?)"')
 }
 
 class EmailConfig:
     """Email configuration container"""
-    def __init__(self, smtp_server, smtp_port, sender_email, sender_password, recipient_email, use_tls=True):
+    def __init__(self, smtp_server, smtp_port, sender_email, sender_password, recipient_emails, cc_emails=None, use_tls=True):
         self.smtp_server = smtp_server
         self.smtp_port = smtp_port
         self.sender_email = sender_email
         self.sender_password = sender_password
-        self.recipient_email = recipient_email
+        self.recipient_emails = [email.strip() for email in recipient_emails.split(',')]
+        self.cc_emails = [email.strip() for email in cc_emails.split(',')] if cc_emails else []
         self.use_tls = use_tls
+
+
 
 class SyslogUDPHandler:
     """Handler for syslog UDP messages"""
@@ -490,7 +493,7 @@ class MessageProcessor:
                 details_dict = json.loads(details.replace('\\"', '"'))
                 target_user = details_dict.get('user', 'unknown')
                 operation_type = details_dict.get('operation', '').lower()
-        
+
                 if target_user.lower() == principal.lower():
                     return f"User {principal} updated their own password on {timestamp}."
                 else:
@@ -570,9 +573,9 @@ class MessageProcessor:
             return f"User {principal} created a new user with username \"{username}\" and role(s): {roles_str} on {timestamp}."
 
 
-        #elif msg_type == 'user_grant':
-        #    username, roles = self.extract_user_info(full_message, details)
-        #    roles_str = ", ".join(roles) if roles else "None"
+        elif msg_type == 'user_grant':
+            username, roles = self.extract_user_info(full_message, details)
+            roles_str = ", ".join(roles) if roles else "None"
 
             # Check if this is a role removal by looking at specific role changes
             if "removed privileges" in full_message.lower() or len(roles) < 4:  # Heuristic check for role reduction
@@ -659,25 +662,32 @@ class MessageProcessor:
 
 
 
+
     def send_email(self, subject, body):
-        """Send an email notification"""
         try:
             msg = MIMEMultipart()
             msg['From'] = self.email_config.sender_email
-            msg['To'] = self.email_config.recipient_email
-            msg['Subject'] = subject
+            msg['To'] = ', '.join(self.email_config.recipient_emails)
 
+            if self.email_config.cc_emails:
+                msg['Cc'] = ', '.join(self.email_config.cc_emails)
+
+            msg['Subject'] = subject
             msg.attach(MIMEText(body, 'plain'))
+
+            recipients = self.email_config.recipient_emails + self.email_config.cc_emails
 
             with smtplib.SMTP(self.email_config.smtp_server, self.email_config.smtp_port) as server:
                 if self.email_config.use_tls:
                     server.starttls()
                 server.login(self.email_config.sender_email, self.email_config.sender_password)
-                server.send_message(msg)
+                server.sendmail(self.email_config.sender_email, recipients, msg.as_string())
 
             logger.info(f"Email sent: {subject}")
         except Exception as e:
             logger.error(f"Error sending email: {e}")
+
+
 
 def main():
     # Parse command line arguments
@@ -687,8 +697,8 @@ def main():
     parser.add_argument('--smtp-server', required=True, help='SMTP server hostname')
     parser.add_argument('--smtp-port', type=int, default=587, help='SMTP server port (default: 587)')
     parser.add_argument('--sender-email', required=True, help='Sender email address')
-    parser.add_argument('--sender-password', required=True, help='Sender email password')
     parser.add_argument('--recipient-email', required=True, help='Recipient email address')
+    parser.add_argument('--cc', help='Comma-separated list of CC recipients')
     parser.add_argument('--no-tls', action='store_true', help='Disable TLS for SMTP connection')
     parser.add_argument('--test', action='store_true', help='Run in test mode with sample messages')
     parser.add_argument('--debug', action='store_true', help='Enable debug logging')
@@ -701,16 +711,17 @@ def main():
 
     # Create message queue
     message_queue = queue.Queue()
-
+    EMAIL_PASSWORD = "ADDYOURPASSWORDHERE"
     # Create email configuration
     email_config = EmailConfig(
         smtp_server=args.smtp_server,
         smtp_port=args.smtp_port,
         sender_email=args.sender_email,
-        sender_password=args.sender_password,
-        recipient_email=args.recipient_email,
+        sender_password=EMAIL_PASSWORD,
+        recipient_emails=args.recipient_email,
+        cc_emails=args.cc,
         use_tls=not args.no_tls
-    )
+)
 
     # Create message processor
     processor = MessageProcessor(message_queue, email_config)
