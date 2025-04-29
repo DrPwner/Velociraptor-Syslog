@@ -73,8 +73,8 @@ python velociraptor-syslog.py \
   --smtp-server smtp.example.com \
   --smtp-port 587 \
   --sender-email alerts@example.com \
-  --sender-password "your-password" \
-  --recipient-email security-team@example.com
+  --recipient-email security-team@example.com \
+  --cc ThatUser@c-o.com 
 ```
 
 ### Command Line Options
@@ -86,11 +86,19 @@ python velociraptor-syslog.py \
 | `--smtp-server` | SMTP server hostname | Required |
 | `--smtp-port` | SMTP server port | `587` |
 | `--sender-email` | Email address to send from | Required |
-| `--sender-password` | Password for sender email | Required |
-| `--recipient-email` | Email address to send notifications to | Required |
+| `--recipient-email` | Email address(es) to send notifications to | Required |
+| `--cc` | Optional email address(es) to CC on notifications | None |
 | `--no-tls` | Disable TLS for SMTP connection | TLS enabled by default |
 | `--test` | Run in test mode with sample messages | Disabled by default |
 | `--debug` | Enable debug logging | Info level by default |
+
+
+**Note:** The --recipient-email and --cc options now support multiple email addresses, separated by commas.
+
+Example:
+```bash
+--recipient-email alice@example.com,bob@example.com --cc bobs-mum@example.com,alices-father@example.com
+```
 
 ## Test Mode
 
@@ -115,21 +123,15 @@ The script sends tailored email notifications for each detected event type. Exam
 - `User analyst Quarantined the following endpoint(s): C.5678efgh on 2023-04-26T15:12:03+00:00`
 - `User admin Created a hunt "Windows.System.ProcessListing" (H.ABCD1234), with a title of "Daily Process Hunt" and a description of "Collection of all running processes" on "root" org on 2023-04-26T09:15:43+00:00`
 
-## Production Deployment
-
-For production use, consider:
-
-1. Running as a system service (systemd)
-2. Using environment variables or a secure password store instead of command-line password parameters
-3. Implementing log rotation for the log file
-4. Setting up proper firewall rules to restrict UDP port access
 
 ## Security Considerations
 
 - The script listens on UDP port 514 by default, which is a privileged port (below 1024)
 - Running with root/administrator privileges may be required for binding to this port
 - Consider network segmentation to prevent unauthorized access to the syslog port
-- Email credentials are specified on the command line, which may be visible in process listings
+- Email credentials are specified in the code, which is considered a security risk.
+
+Note: The sender email password has been embedded directly in the source code for ease of testing and demonstration purposes. For production use, it is strongly recommended to implement a secure method for managing secrets—such as using environment variables, encrypted configuration files, or a dedicated secrets manager.
 
 ## Why?
 
