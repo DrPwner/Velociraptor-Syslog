@@ -33,14 +33,13 @@ logger = logging.getLogger('velociraptor_monitor')
 
 # Regular Expression Patterns
 PATTERNS = {
-    'powershell_command': re.compile(
-        r'details=".*?Windows\.System\.PowerShell.*?\{\\"key\\":\\"Command\\",\\"value\\":\\"(?P<command>[^\\"]+)\\".*?principal=(?P<principal>\w+)',
-        re.IGNORECASE
+
+    'command_execution': re.compile(
+        r'msg=ScheduleFlow details="(?P<raw_details>.*?)" operation=ScheduleFlow principal=(?P<principal>\w+)',
+        re.DOTALL
     ),
-    'cmd_command': re.compile(
-       r'details=".*?Windows\.System\.CmdShell.*?\{\\"key\\":\\"Command\\",\\"value\\":\\"(?P<command>[^\\"]+)\\".*?principal=(?P<principal>\w+)',
-       re.IGNORECASE
-    ),
+
+
     'quarantine_host': re.compile(
         r'msg=ScheduleFlow.*?Windows\.Remediation\.Quarantine'
         r'(?!.*RemovePolicy)'
@@ -431,19 +430,45 @@ class MessageProcessor:
         timestamp = self._extract_timestamp(full_message)
         principal = match.group('principal') if 'principal' in match.groupdict() else "unknown"
 
-        if msg_type == 'powershell_command':
-            command = match.group('command')
-            client_id = self.extract_client_id(full_message, details)
-            return f"User {principal} executed \"{command}\" command through \"Powershell\" on endpoint \"{client_id}\" on {timestamp}"
 
-        elif msg_type == 'cmd_command':
-            command = match.group('command')
-            client_id = self.extract_client_id(full_message, details)
-            return f"User {principal} executed \"{command}\" command through \"CMD Shell\" on endpoint \"{client_id}\" on {timestamp}"
-
-        elif msg_type == 'hunt_canceled':
+        if msg_type == 'hunt_canceled':
             hunt_id = match.group('hunt_id')
             return f"User {principal} canceled hunt \"{hunt_id}\" on {timestamp}."
+
+        elif msg_type == 'command_execution':
+            try:
+                principal = match.group('principal')
+                raw_details = match.group('raw_details')
+
+                # Unescape the escaped JSON string
+                unescaped = raw_details.encode().decode("unicode_escape")
+                details_dict = json.loads(unescaped)
+
+                client_id = details_dict.get('client') or details_dict.get('details', {}).get('client_id')
+                artifact = details_dict.get('details', {}).get('artifacts', [None])[0]
+
+                env = (
+                    details_dict.get('details', {})
+                    .get('specs', [{}])[0]
+                    .get('parameters', {})
+                    .get('env', [])
+                )
+
+                command = next((e.get("value") for e in env if e.get("key") == "Command"), None)
+
+                if not command or not artifact:
+                    return None
+
+                if artifact == "Windows.System.PowerShell":
+                    return f"User {principal} executed \"{command}\" command through \"Powershell\" on endpoint \"{client_id}\" on {timestamp}"
+                elif artifact == "Windows.System.CmdShell":
+                    return f"User {principal} executed \"{command}\" command through \"CMD Shell\" on endpoint \"{client_id}\" on {timestamp}"
+            except Exception as e:
+                logger.error(f"Failed to parse ScheduleFlow command: {e}")
+                return None
+
+
+
 
         elif msg_type == 'hunt_created':
             hunt_id, title, description, artifacts = self.extract_hunt_info(full_message, details)
@@ -711,7 +736,7 @@ def main():
 
     # Create message queue
     message_queue = queue.Queue()
-    EMAIL_PASSWORD = "ADDYOURPASSWORDHERE"
+    EMAIL_PASSWORD = "ENTERPASSWORDHERE"
     # Create email configuration
     email_config = EmailConfig(
         smtp_server=args.smtp_server,
