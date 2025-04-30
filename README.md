@@ -99,6 +99,13 @@ Example:
 ```bash
 --recipient-email alice@example.com,bob@example.com --cc bobs-mum@example.com,alices-father@example.com
 ```
+Additionally, add your user password here:
+```python
+# Create message queue
+    message_queue = queue.Queue()
+    EMAIL_PASSWORD = "ENTERPASSWORDHERE"
+    # Create email configuration
+```
 
 ## Test Mode
 
