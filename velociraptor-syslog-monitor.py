@@ -19,7 +19,7 @@ from datetime import datetime
 import threading
 import queue
 import time
-
+import codecs
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -35,11 +35,9 @@ logger = logging.getLogger('velociraptor_monitor')
 PATTERNS = {
 
     'command_execution': re.compile(
-        r'msg=ScheduleFlow details="(?P<raw_details>.*?)" operation=ScheduleFlow principal=(?P<principal>\w+)',
+        r'details="(?P<raw_details>\{.*?Windows\.System\.(?:Cmd|Power)Shell.*?\})".*?principal=(?P<principal>\w+)',
         re.DOTALL
     ),
-
-
     'quarantine_host': re.compile(
         r'msg=ScheduleFlow.*?Windows\.Remediation\.Quarantine'
         r'(?!.*RemovePolicy)'
@@ -440,8 +438,8 @@ class MessageProcessor:
                 principal = match.group('principal')
                 raw_details = match.group('raw_details')
 
-                # Unescape the escaped JSON string
-                unescaped = raw_details.encode().decode("unicode_escape")
+
+                unescaped = codecs.decode(raw_details, 'unicode_escape')
                 details_dict = json.loads(unescaped)
 
                 client_id = details_dict.get('client') or details_dict.get('details', {}).get('client_id')
@@ -466,6 +464,8 @@ class MessageProcessor:
             except Exception as e:
                 logger.error(f"Failed to parse ScheduleFlow command: {e}")
                 return None
+
+
 
 
 
@@ -736,7 +736,7 @@ def main():
 
     # Create message queue
     message_queue = queue.Queue()
-    EMAIL_PASSWORD = "ENTERPASSWORDHERE"
+    EMAIL_PASSWORD = "YOURPASSHERE"
     # Create email configuration
     email_config = EmailConfig(
         smtp_server=args.smtp_server,
